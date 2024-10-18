@@ -1,136 +1,159 @@
 <!DOCTYPE html>
 <html lang="en">
-    <head>
-        <title>Form validation with messages on top: Code example - Accessibility Developer Guide example</title>
-        <meta charset="utf-8">
-        <style>.control, fieldset {
-      margin: 6px 0;
-    }
-    
-    label {
-      display: inline-block;
-      width: 120px;
-      vertical-align: top;
-    }
-    
-    input + label {
-      width: auto;
-    }
-    
-    .error, .required {
-      color: red;
-    }
-    
-    fieldset ul {
-      margin: 0;
-    }</style>
-    </head>
-    <body>
-        <h1>Feedback form</h1>
+<head>
+    <title>Accessible Feedback Form</title>
+    <meta charset="utf-8">
+    <style>
+        .control, fieldset {
+            margin: 6px 0;
+        }
+
+        label {
+            display: inline-block;
+            width: 120px;
+            vertical-align: top;
+        }
+
+        .error, .required {
+            color: red;
+        }
+
+        fieldset ul {
+            margin: 0;
+        }
+
+        .errors {
+            color: red;
+        }
+
+        .error-field {
+            border: 2px solid red;
+        }
+
+        .visually-hidden {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Feedback form</h1>
     <form>
+        <p id="required-description">Fields marked with an asterisk (*) are required.</p>
+
         <div class="control">
-          <label>Full name <span class="required">*</span></label><input id="name" name="name" type="text" />
+            <label for="name">Full name <span class="required">*</span></label>
+            <input id="name" name="name" type="text" aria-required="true" aria-describedby="name-instructions required-description" />
+            <span id="name-instructions" class="visually-hidden">Please provide your full name.</span>
         </div>
+
         <div class="control">
-          <label>Biography</label><textarea id="biography" name="biography" type="text"></textarea>
-          <span>Include examples on your skills in JavaScript.</span>
+            <label for="biography">Biography</label>
+            <textarea id="biography" name="biography" aria-describedby="bio-instructions"></textarea>
+            <span id="bio-instructions">Include examples of your skills in JavaScript.</span>
         </div>
-        
-          <div>Gender</div>
-          <div class="control">
-            <input id="gender_male" name="gender" type="radio" value="male" /><label>Male</label>
-          </div>
-          <div class="control">
-            <input id="gender_female" name="gender" type="radio" value="female" /><label>Female</label>
-          </div>
-        
+
+        <fieldset class="control">
+            <legend>Gender</legend>
+            <div>
+                <input id="gender_male" name="gender" type="radio" value="male" />
+                <label for="gender_male">Male</label>
+            </div>
+            <div>
+                <input id="gender_female" name="gender" type="radio" value="female" />
+                <label for="gender_female">Female</label>
+            </div>
+        </fieldset>
+
         <div class="control">
-          <input id="accept_agbs" name="accept_agbs" type="checkbox" value="1" /><label>I accept the terms and conditions</label>
+            <input id="accept_agbs" name="accept_agbs" type="checkbox" value="1" />
+            <label for="accept_agbs">I accept the terms and conditions</label>
         </div>
+
         <div class="control">
-          <input name="validate" type="hidden" value="1" /><input type="submit" value="Register" />
+            <input name="validate" type="hidden" value="1" />
+            <input type="submit" value="Register" />
         </div>
-      </form>
-      
-          <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.min.js" integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8=" crossorigin="anonymous"></script>
-          <script>"use strict";
-      
-      ;
-      (function () {
+    </form>
+
+    <div id="status" role="status" aria-live="polite"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+    <script>
+    "use strict";
+    (function () {
         var validateInput;
-      
+
         $.urlParam = function (name) {
-          var results;
-          results = new RegExp('[?&]' + name + '=([^&#]*)').exec(window.location.href);
-      
-          if (results === null) {
-            return null;
-          } else {
-            return decodeURI(results[1]) || null;
-          }
+            var results = new RegExp('[?&]' + name + '=([^&#]*)').exec(window.location.href);
+            return results ? decodeURI(results[1]) || null : null;
         };
-      
+
         validateInput = function validateInput(input, message) {
-          var $elementToDescribe, $error, $errorContainer, $fieldset, $input, $referencedElement, value;
-          $input = $('[name="' + input + '"]');
-      
-          if ((value = $.urlParam(input)) === null) {
-            if ($('fieldset.errors').length === 0) {
-              $('form').prepend('<fieldset class="errors"><legend>Errors</legend><ul></ul></fieldset>');
+            var $elementToDescribe, $error, $errorContainer, $input, $referencedElement, value;
+            $input = $('[name="' + input + '"]');
+
+            if ((value = $.urlParam(input)) === null) {
+                if ($('fieldset.errors').length === 0) {
+                    $('form').prepend('<fieldset class="errors" aria-live="assertive"><legend>Errors</legend><ul></ul></fieldset>');
+                }
+
+                $referencedElement = $input;
+                $elementToDescribe = $input;
+                $errorContainer = $('fieldset.errors ul');
+
+                $error = $('<a href="#' + input + '">' + message + '</a>');
+                $error.click(function (e) {
+                    $referencedElement.focus();
+                    e.preventDefault();
+                });
+                $elementToDescribe.attr('aria-describedby', input + '_description');
+                $errorContainer.append('<li>' + $error[0].outerHTML + '</li>');
+
+                // Add visual indication of error
+                $input.addClass('error-field');
+                $input.attr('aria-invalid', 'true');
+
+                $('.errors').focus();
             }
-      
-            $referencedElement = null;
-            $elementToDescribe = null;
-            $errorContainer = $('fieldset.errors ul');
-      
-            if ($input.is(':radio')) {
-              $fieldset = $input.closest('fieldset');
-              $elementToDescribe = $fieldset;
-              $referencedElement = $input.filter(':first');
-            } else {
-              $elementToDescribe = $input;
-              $referencedElement = $input;
-            }
-      // R.G. hint: fix next line ;)
-            $error = $('<a>' + message + '</a>');
-            $error.click(function (e) {
-              // If we rely on the link's href pointing to the input's ID, it doesn't trigger forms mode in screen readers
-              $referencedElement.focus();
-              return e.preventDefault();
-            });
-            $elementToDescribe.attr('aria-describedby', input + '_description');
-            $errorContainer.append('<li>').find('li:last').append($error);
-      
-            if ($(':not(form):focus').length === 0) {
-              // See https://stackoverflow.com/questions/46134247/jquery-setting-focus-doesnt-work-in-ie11/
-            
-            }
-          } else {
-            if ($input.is(':checkbox')) {
-              $input.attr('checked', true);
-            }
-      
-            if ($input.is(':radio')) {
-              return $input.filter('[value="' + value + '"]').attr('checked', true);
-            } else {
-              return $input.val(value);
-            }
-          }
         };
-      
+
+        function handleSuccess() {
+            $('#status').text('Form submitted successfully. Thank you for your feedback!');
+            $('#status').focus();
+        }
+
         $(document).ready(function () {
-          if ($.urlParam('validate')) {
-            validateInput('name', 'Please enter your name!');
-            validateInput('biography', 'Please tell us something about your history!');
-            validateInput('gender', 'Please tell us your gender!');
-            validateInput('accept_agbs', 'You must accept our terms and conditions!');
-      
-            if ($('.error').length === 0) {
-              return alert('All inputs are valid.');
+            if ($.urlParam('validate')) {
+                validateInput('name', 'Please enter your name!');
+                validateInput('biography', 'Please tell us something about your history!');
+                validateInput('gender', 'Please tell us your gender!');
+                validateInput('accept_agbs', 'You must accept our terms and conditions!');
+
+                if ($('.errors').length === 0) {
+                    handleSuccess();
+                }
             }
-          }
+
+            // Basic inline validation
+            $('form input, form textarea').on('blur', function() {
+                if (this.value.trim() === '' && $(this).attr('aria-required') === 'true') {
+                    $(this).addClass('error-field');
+                    $(this).attr('aria-invalid', 'true');
+                } else {
+                    $(this).removeClass('error-field');
+                    $(this).removeAttr('aria-invalid');
+                }
+            });
         });
-      }).call(void 0);</script>
-                
-        </body>
-      </html>
+    })();
+    </script>
+</body>
+</html>
