@@ -20,6 +20,8 @@
 
         fieldset ul {
             margin: 0;
+            padding: 0;
+            list-style-type: none;
         }
 
         .errors {
@@ -41,11 +43,20 @@
             white-space: nowrap;
             border: 0;
         }
+
+        .checkbox-container {
+            display: flex;
+            align-items: center;
+        }
+
+        .checkbox-container input[type="checkbox"] {
+            margin-right: 10px;
+        }
     </style>
 </head>
 <body>
     <h1>Feedback form</h1>
-    <form>
+    <form id="feedbackForm">
         <p id="required-description">Fields marked with an asterisk (*) are required.</p>
 
         <div class="control">
@@ -62,23 +73,24 @@
 
         <fieldset class="control">
             <legend>Gender</legend>
-            <div>
-                <input id="gender_male" name="gender" type="radio" value="male" />
-                <label for="gender_male">Male</label>
-            </div>
-            <div>
-                <input id="gender_female" name="gender" type="radio" value="female" />
-                <label for="gender_female">Female</label>
-            </div>
+            <ul>
+                <li>
+                    <input id="gender_male" name="gender" type="radio" value="male" />
+                    <label for="gender_male">Male</label>
+                </li>
+                <li>
+                    <input id="gender_female" name="gender" type="radio" value="female" />
+                    <label for="gender_female">Female</label>
+                </li>
+            </ul>
         </fieldset>
 
-        <div class="control">
+        <div class="control checkbox-container">
             <input id="accept_agbs" name="accept_agbs" type="checkbox" value="1" />
             <label for="accept_agbs">I accept the terms and conditions</label>
         </div>
 
         <div class="control">
-            <input name="validate" type="hidden" value="1" />
             <input type="submit" value="Register" />
         </div>
     </form>
@@ -89,41 +101,56 @@
     <script>
     "use strict";
     (function () {
-        var validateInput;
+        function validateInput(input, message) {
+            var $input = $('[name="' + input + '"]');
+            var value = $input.val();
 
-        $.urlParam = function (name) {
-            var results = new RegExp('[?&]' + name + '=([^&#]*)').exec(window.location.href);
-            return results ? decodeURI(results[1]) || null : null;
-        };
-
-        validateInput = function validateInput(input, message) {
-            var $elementToDescribe, $error, $errorContainer, $input, $referencedElement, value;
-            $input = $('[name="' + input + '"]');
-
-            if ((value = $.urlParam(input)) === null) {
-                if ($('fieldset.errors').length === 0) {
-                    $('form').prepend('<fieldset class="errors" aria-live="assertive"><legend>Errors</legend><ul></ul></fieldset>');
+            if (input === 'accept_agbs') {
+                if (!$input.prop('checked')) {
+                    addError(input, message);
+                    return false;
                 }
-
-                $referencedElement = $input;
-                $elementToDescribe = $input;
-                $errorContainer = $('fieldset.errors ul');
-
-                $error = $('<a href="#' + input + '">' + message + '</a>');
-                $error.click(function (e) {
-                    $referencedElement.focus();
-                    e.preventDefault();
-                });
-                $elementToDescribe.attr('aria-describedby', input + '_description');
-                $errorContainer.append('<li>' + $error[0].outerHTML + '</li>');
-
-                // Add visual indication of error
-                $input.addClass('error-field');
-                $input.attr('aria-invalid', 'true');
-
-                $('.errors').focus();
+            } else if (!value.trim()) {
+                addError(input, message);
+                return false;
             }
-        };
+
+            removeError(input);
+            return true;
+        }
+
+        function addError(input, message) {
+            var $input = $('[name="' + input + '"]');
+            if ($('fieldset.errors').length === 0) {
+                $('form').prepend('<fieldset class="errors" aria-live="assertive"><legend>Errors</legend><ul></ul></fieldset>');
+            }
+
+            var $errorContainer = $('fieldset.errors ul');
+            var errorId = input + '_error';
+
+            if (!$('#' + errorId).length) {
+                var $error = $('<li id="' + errorId + '"><a href="#' + input + '">' + message + '</a></li>');
+                $errorContainer.append($error);
+
+                $error.find('a').click(function (e) {
+                    e.preventDefault();
+                    $input.focus();
+                });
+            }
+
+            $input.addClass('error-field');
+            $input.attr('aria-invalid', 'true');
+            $input.attr('aria-describedby', (input + '_description ' + errorId).trim());
+        }
+
+        function removeError(input) {
+            var $input = $('[name="' + input + '"]');
+            var errorId = input + '_error';
+            $('#' + errorId).remove();
+            $input.removeClass('error-field');
+            $input.removeAttr('aria-invalid');
+            $input.attr('aria-describedby', input + '_description');
+        }
 
         function handleSuccess() {
             $('#status').text('Form submitted successfully. Thank you for your feedback!');
@@ -131,25 +158,44 @@
         }
 
         $(document).ready(function () {
-            if ($.urlParam('validate')) {
-                validateInput('name', 'Please enter your name!');
-                validateInput('biography', 'Please tell us something about your history!');
-                validateInput('gender', 'Please tell us your gender!');
-                validateInput('accept_agbs', 'You must accept our terms and conditions!');
+            $('#feedbackForm').on('submit', function(e) {
+                e.preventDefault();
+                var isValid = true;
 
-                if ($('.errors').length === 0) {
+                isValid = validateInput('name', 'Please enter your name!') && isValid;
+                isValid = validateInput('biography', 'Please tell us something about your history!') && isValid;
+                isValid = validateInput('gender', 'Please tell us your gender!') && isValid;
+                isValid = validateInput('accept_agbs', 'You must accept our terms and conditions!') && isValid;
+
+                if (isValid) {
                     handleSuccess();
-                }
-            }
-
-            // Basic inline validation
-            $('form input, form textarea').on('blur', function() {
-                if (this.value.trim() === '' && $(this).attr('aria-required') === 'true') {
-                    $(this).addClass('error-field');
-                    $(this).attr('aria-invalid', 'true');
                 } else {
-                    $(this).removeClass('error-field');
-                    $(this).removeAttr('aria-invalid');
+                    $('.errors').focus();
+                }
+            });
+
+            $('form input, form textarea').on('blur', function() {
+                validateInput($(this).attr('name'), 'This field is required');
+            });
+
+            $('input[type="radio"]').keydown(function(e) {
+                var idx = $('input[type="radio"]').index(this);
+                if (e.which === 38 || e.which === 37) { // Up or Left arrow
+                    e.preventDefault();
+                    $('input[type="radio"]').eq((idx - 1 + $('input[type="radio"]').length) % $('input[type="radio"]').length).focus();
+                }
+                if (e.which === 40 || e.which === 39) { // Down or Right arrow
+                    e.preventDefault();
+                    $('input[type="radio"]').eq((idx + 1) % $('input[type="radio"]').length).focus();
+                }
+            });
+
+            // New event listener for the checkbox
+            $('#accept_agbs').on('keypress', function(event) {
+                if (event.which === 13) { // 13 is the key code for Enter
+                    event.preventDefault(); // Prevent form submission
+                    this.checked = !this.checked; // Toggle the checkbox
+                    $(this).trigger('change'); // Trigger change event for any listeners
                 }
             });
         });
